@@ -60,6 +60,7 @@ import androidx.compose.material.icons.automirrored.rounded.ListAlt
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Settings
+import com.google.ai.edge.gallery.server.ServerDrawerItem
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -325,6 +326,11 @@ fun HomeScreen(
                     ),
                 )
               }
+              Spacer(modifier = Modifier.height(16.dp))
+              ServerDrawerItem(
+                downloadedModels = modelManagerViewModel.getAllDownloadedModels(),
+                onStarted = { scope.launch { drawerState.close() } },
+              )
             }
           }
         },
