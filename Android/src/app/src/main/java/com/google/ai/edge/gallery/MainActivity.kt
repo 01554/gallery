@@ -35,6 +35,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import com.google.ai.edge.gallery.server.ServerFloatingButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
@@ -74,7 +78,14 @@ class MainActivity : ComponentActivity() {
       setContent {
         GalleryTheme {
           Surface(modifier = Modifier.fillMaxSize()) {
-            GalleryApp(modelManagerViewModel = modelManagerViewModel)
+            Box(modifier = Modifier.fillMaxSize()) {
+              GalleryApp(modelManagerViewModel = modelManagerViewModel)
+              ServerFloatingButton(
+                modifier = Modifier
+                  .align(Alignment.BottomStart)
+                  .padding(16.dp),
+              )
+            }
 
             // Fade out a "mask" that has the same color as the background of the splash screen
             // to reveal the actual app content.
