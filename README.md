@@ -12,7 +12,7 @@ This means you can run Gemma 4 (or other LiteRT models) on your phone's GPU and 
 
 ### Why?
 
-On devices with Qualcomm Adreno 6xx GPUs (e.g. Snapdragon 888), llama.cpp's Vulkan and OpenCL backends both crash due to driver incompatibilities. TFLite GPU delegate is the only reliable way to do GPU inference on these devices. See [the full writeup](https://note.com/If_and_and/n/n363b74fa9579) for the investigation.
+On devices with Qualcomm Adreno 6xx GPUs (e.g. Snapdragon 888), llama.cpp's Vulkan and OpenCL backends both crash due to driver incompatibilities. TFLite GPU delegate is the only reliable way to do GPU inference on these devices.
 
 ### Added files
 

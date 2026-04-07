@@ -12,7 +12,7 @@ Google AI Edge Galleryは、TFLite GPU delegateを使って端末上でLLMを動
 
 ### なぜ作ったのか
 
-Qualcomm Adreno 6xx GPU（Snapdragon 888など）では、llama.cppのVulkan/OpenCLバックエンドがドライバー互換性の問題でクラッシュします。TFLite GPU delegateはGoogleがQualcommと協力して互換性を確保しているため、これらの端末でGPU推論ができる唯一の信頼できる方法です。詳しい調査の経緯は[こちらの記事](https://note.com/If_and_and/n/n363b74fa9579)をご覧ください。
+Qualcomm Adreno 6xx GPU（Snapdragon 888など）では、llama.cppのVulkan/OpenCLバックエンドがドライバー互換性の問題でクラッシュします。TFLite GPU delegateはGoogleがQualcommと協力して互換性を確保しているため、これらの端末でGPU推論ができる唯一の信頼できる方法です。
 
 ### 追加したファイル
 
