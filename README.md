@@ -19,7 +19,9 @@ On devices with Qualcomm Adreno 6xx GPUs (e.g. Snapdragon 888), llama.cpp's Vulk
 | File | Description |
 |------|-------------|
 | `app/.../server/LlmHttpServer.kt` | NanoHTTPD server with `/v1/chat/completions`, `/v1/models`, `/health` |
-| `app/.../server/LlmServerService.kt` | Foreground Service that loads model with `Backend.GPU()` and starts HTTP server |
+| `app/.../server/LlmServerService.kt` | Foreground Service that loads model with `Backend.GPU()` and starts HTTP server. Exposes server state via `StateFlow` |
+| `app/.../server/ServerDrawerItem.kt` | Navigation drawer item for server start/stop with color-coded status |
+| `app/.../server/ServerButton.kt` | Floating action button (kept for reference, not used in current UI) |
 
 ### Modified files
 
@@ -27,6 +29,7 @@ On devices with Qualcomm Adreno 6xx GPUs (e.g. Snapdragon 888), llama.cpp's Vulk
 |------|--------|
 | `app/build.gradle.kts` | Added `nanohttpd:2.3.1` dependency |
 | `AndroidManifest.xml` | Added Service registration and `FOREGROUND_SERVICE_SPECIAL_USE` permission |
+| `HomeScreen.kt` | Added "API Server" item to the navigation drawer (alongside Settings and Models) |
 
 ## Quick Start
 

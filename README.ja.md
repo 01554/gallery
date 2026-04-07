@@ -19,7 +19,9 @@ Qualcomm Adreno 6xx GPU（Snapdragon 888など）では、llama.cppのVulkan/Ope
 | ファイル | 説明 |
 |---------|------|
 | `app/.../server/LlmHttpServer.kt` | NanoHTTPDによるHTTPサーバー。`/v1/chat/completions`, `/v1/models`, `/health`を提供 |
-| `app/.../server/LlmServerService.kt` | `Backend.GPU()`でモデルをロードし、HTTPサーバーを起動するForeground Service |
+| `app/.../server/LlmServerService.kt` | `Backend.GPU()`でモデルをロードし、HTTPサーバーを起動するForeground Service。サーバー状態を`StateFlow`で公開 |
+| `app/.../server/ServerDrawerItem.kt` | ナビゲーションドロワー用のサーバー起動/停止項目。状態に応じて色が変わる |
+| `app/.../server/ServerButton.kt` | フローティングボタン版（参考用に残存、現UIでは未使用） |
 
 ### 変更したファイル
 
@@ -27,6 +29,7 @@ Qualcomm Adreno 6xx GPU（Snapdragon 888など）では、llama.cppのVulkan/Ope
 |---------|---------|
 | `app/build.gradle.kts` | `nanohttpd:2.3.1`の依存を追加 |
 | `AndroidManifest.xml` | Serviceの登録と`FOREGROUND_SERVICE_SPECIAL_USE`パーミッションを追加 |
+| `HomeScreen.kt` | ナビゲーションドロワーに「API Server」項目を追加（Settings・Modelsと同じ位置） |
 
 ## 使い方
 
