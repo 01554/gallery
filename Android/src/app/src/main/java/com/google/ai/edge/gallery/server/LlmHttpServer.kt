@@ -92,6 +92,12 @@ class LlmHttpServer(
         // Build prompt from messages
         val prompt = buildPrompt(messages)
 
+        // Parse sampling parameters from request (OpenAI-compatible names)
+        val temperature = requestJson.optDouble("temperature", 0.7)
+        val topK = requestJson.optInt("top_k", 64)
+        val topP = requestJson.optDouble("top_p", 0.95)
+        val enableThinking = requestJson.optBoolean("enable_thinking", false)
+
         // Estimate prompt tokens (rough: 1 token ~ 4 chars)
         val estimatedPromptTokens = prompt.length / 4
 
@@ -99,15 +105,18 @@ class LlmHttpServer(
         val conversation = engine.createConversation(
             ConversationConfig(
                 samplerConfig = SamplerConfig(
-                    topK = 64,
-                    topP = 0.95,
-                    temperature = requestJson.optDouble("temperature", 0.7),
+                    topK = topK,
+                    topP = topP,
+                    temperature = temperature,
                 )
             )
         )
 
+        val extraContext = if (enableThinking) mapOf("enable_thinking" to "true") else emptyMap()
+
         // Run inference synchronously
         val result = StringBuilder()
+        val thinking = StringBuilder()
         val latch = CountDownLatch(1)
         val tokenCount = AtomicInteger(0)
         var inferenceError: String? = null
@@ -116,6 +125,10 @@ class LlmHttpServer(
             Contents.of(listOf(Content.Text(prompt))),
             object : MessageCallback {
                 override fun onMessage(message: Message) {
+                    val thought = message.channels["thought"]
+                    if (thought != null) {
+                        thinking.append(thought)
+                    }
                     result.append(message.toString())
                     tokenCount.incrementAndGet()
                 }
@@ -130,7 +143,7 @@ class LlmHttpServer(
                     latch.countDown()
                 }
             },
-            emptyMap(),
+            extraContext,
         )
 
         // Wait for completion (timeout: 5 minutes)
@@ -162,6 +175,9 @@ class LlmHttpServer(
                     put("message", JSONObject().apply {
                         put("role", "assistant")
                         put("content", result.toString())
+                        if (thinking.isNotEmpty()) {
+                            put("reasoning_content", thinking.toString())
+                        }
                     })
                     put("finish_reason", "stop")
                 })
