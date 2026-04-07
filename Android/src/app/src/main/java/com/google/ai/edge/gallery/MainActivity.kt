@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
 import com.google.ai.edge.gallery.server.ServerFloatingButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -80,11 +81,16 @@ class MainActivity : ComponentActivity() {
           Surface(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.fillMaxSize()) {
               GalleryApp(modelManagerViewModel = modelManagerViewModel)
+              // Observe uiState so the model list updates after downloads complete
+              val uiState by modelManagerViewModel.uiState.collectAsState()
+              val downloadedModels = remember(uiState.modelDownloadStatus) {
+                modelManagerViewModel.getAllDownloadedModels()
+              }
               ServerFloatingButton(
                 modifier = Modifier
                   .align(Alignment.BottomStart)
                   .padding(16.dp),
-                downloadedModels = modelManagerViewModel.getAllDownloadedModels(),
+                downloadedModels = downloadedModels,
               )
             }
 
