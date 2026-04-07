@@ -33,7 +33,7 @@ On devices with Qualcomm Adreno 6xx GPUs (e.g. Snapdragon 888), llama.cpp's Vulk
 
 ## Quick Start
 
-### 1. Build the APK
+### 1. Build and install
 
 ```bash
 # Requires Java 21 and Android SDK
@@ -41,29 +41,58 @@ export JAVA_HOME=/path/to/openjdk-21
 cd Android/src
 echo "sdk.dir=/path/to/android-sdk" > local.properties
 ./gradlew :app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### 2. Install APK and push a model
+### 2. Download a model
+
+Open the app, tap the **hamburger menu** (top-left), then tap **Models**. Download a model from the list (e.g. **Gemma 4 E2B**). The server will use models downloaded here.
+
+Alternatively, you can push a `.litertlm` file manually:
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-
-# Download and push Gemma 4 E2B (2.4GB, works on 8GB RAM devices)
 curl -L "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm" \
   -o gemma-4-E2B-it.litertlm
 adb push gemma-4-E2B-it.litertlm /data/local/tmp/
 ```
 
-### 3. Start the server
+### 3. Start the server (from the app UI)
+
+Open the **hamburger menu** (top-left). You'll see **"API Server"** below Settings and Models.
+
+| Server status | Color | Action |
+|---------------|-------|--------|
+| Stopped | Gray border & icon | Tap to start |
+| Loading model | Orange border & icon | Wait for model to load |
+| Running | Green border & icon (shows port) | Tap to stop |
+| Error | Red border & icon | Tap to retry |
+
+When you tap "API Server":
+- If **one model** is available, the server starts immediately
+- If **multiple models** are available, a picker dialog lets you choose which model to load
+- The server loads the model onto the **GPU** and starts listening on `localhost:8080`
+
+Models are discovered from two sources:
+- Models downloaded via the app's **Models** page
+- `.litertlm` files in `/data/local/tmp/`
+
+### 4. Start the server (via adb, alternative)
+
+You can also start/stop the server from the command line:
 
 ```bash
+# Start
 adb shell am start-foreground-service \
   -n com.google.aiedge.gallery/com.google.ai.edge.gallery.server.LlmServerService \
   --es model_path '/data/local/tmp/gemma-4-E2B-it.litertlm' \
   --ei port 8080
+
+# Stop
+adb shell am stop-service \
+  -n com.google.aiedge.gallery/com.google.ai.edge.gallery.server.LlmServerService
 ```
 
-### 4. Use it
+### 5. Use it
 
 From Termux or any app on the device:
 

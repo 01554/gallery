@@ -33,7 +33,7 @@ Qualcomm Adreno 6xx GPU（Snapdragon 888など）では、llama.cppのVulkan/Ope
 
 ## 使い方
 
-### 1. APKをビルド
+### 1. ビルドとインストール
 
 ```bash
 # Java 21とAndroid SDKが必要です
@@ -41,29 +41,58 @@ export JAVA_HOME=/path/to/openjdk-21
 cd Android/src
 echo "sdk.dir=/path/to/android-sdk" > local.properties
 ./gradlew :app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### 2. APKのインストールとモデルの転送
+### 2. モデルをダウンロード
+
+アプリを開いて、左上の**ハンバーガーメニュー**をタップし、**Models**を選択。一覧からモデル（例: **Gemma 4 E2B**）をダウンロードしてください。サーバーはここでダウンロードしたモデルを使います。
+
+手動で`.litertlm`ファイルを転送することもできます:
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-
-# Gemma 4 E2B (2.4GB, RAM 8GBの端末で動作) をダウンロードして転送
 curl -L "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm" \
   -o gemma-4-E2B-it.litertlm
 adb push gemma-4-E2B-it.litertlm /data/local/tmp/
 ```
 
-### 3. サーバーを起動
+### 3. サーバーを起動（アプリUIから）
+
+左上の**ハンバーガーメニュー**を開くと、SettingsとModelsの下に**「API Server」**があります。
+
+| サーバー状態 | 色 | 操作 |
+|------------|-----|------|
+| 停止中 | グレーの枠線・アイコン | タップで起動 |
+| モデルロード中 | オレンジの枠線・アイコン | ロード完了を待つ |
+| 動作中 | 緑の枠線・アイコン（ポート番号表示） | タップで停止 |
+| エラー | 赤の枠線・アイコン | タップで再試行 |
+
+「API Server」をタップすると:
+- モデルが**1つ**だけの場合、すぐにサーバーが起動します
+- モデルが**複数**ある場合、どのモデルを使うか選択ダイアログが表示されます
+- 選択したモデルを**GPU**にロードし、`localhost:8080`でリクエストを受け付けます
+
+モデルは以下の2箇所から検出されます:
+- アプリの**Models**ページからダウンロードしたモデル
+- `/data/local/tmp/`にある`.litertlm`ファイル
+
+### 4. サーバーを起動（adbコマンド、代替手段）
+
+コマンドラインからも起動・停止できます:
 
 ```bash
+# 起動
 adb shell am start-foreground-service \
   -n com.google.aiedge.gallery/com.google.ai.edge.gallery.server.LlmServerService \
   --es model_path '/data/local/tmp/gemma-4-E2B-it.litertlm' \
   --ei port 8080
+
+# 停止
+adb shell am stop-service \
+  -n com.google.aiedge.gallery/com.google.ai.edge.gallery.server.LlmServerService
 ```
 
-### 4. 使う
+### 5. 使う
 
 端末上のTermuxなどから:
 
