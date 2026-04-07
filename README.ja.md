@@ -95,6 +95,32 @@ curl -X POST http://127.0.0.1:8080/v1/chat/completions \
 - Galaxy Z Flip3 (Snapdragon 888 / Adreno 660, RAM 8GB, Android 14)
 - Gemma 4 E2B: GPU使用率 約40%、モデルロード 約12秒
 
+### ビルド環境 (動作確認済み)
+
+| 項目 | バージョン |
+|------|-----------|
+| ホストOS | macOS 15.6.1 (Apple Silicon / arm64) |
+| Java | OpenJDK 21.0.10 (Homebrew) |
+| Gradle | 8.10.2 |
+| Kotlin | 1.9.24 |
+| Android SDK | compileSdk 35, minSdk 31, targetSdk 35 |
+| NDK | 27.2.12479018 |
+
+**注意:** Java 17では動きません（Hilt/KAPTが`NullPointerException: processingEnv must not be null`を投げます）。Java 21を使ってください。
+
+### 動作確認した端末
+
+| 項目 | 詳細 |
+|------|------|
+| 端末 | Galaxy Z Flip3 (SM-F711N) |
+| SoC | Snapdragon 888 |
+| GPU | Adreno 660 |
+| RAM | 8GB |
+| OS | Android 14 |
+| モデル | Gemma 4 E2B (2.4GB) |
+| GPU使用率 | 推論中 約40% |
+| モデルロード時間 | 約12秒 |
+
 ### サーバーの停止
 
 ```bash

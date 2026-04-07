@@ -95,6 +95,32 @@ Third-party `.litertlm` files may crash. Stick with `litert-community` or `googl
 - Galaxy Z Flip3 (Snapdragon 888 / Adreno 660, 8GB RAM, Android 14)
 - Gemma 4 E2B: GPU usage ~40%, model load ~12s
 
+### Build environment (confirmed working)
+
+| Item | Version |
+|------|---------|
+| Host OS | macOS 15.6.1 (Apple Silicon / arm64) |
+| Java | OpenJDK 21.0.10 (Homebrew) |
+| Gradle | 8.10.2 |
+| Kotlin | 1.9.24 |
+| Android SDK | compileSdk 35, minSdk 31, targetSdk 35 |
+| NDK | 27.2.12479018 |
+
+**Note:** Java 17 does NOT work (Hilt/KAPT throws `NullPointerException: processingEnv must not be null`). Use Java 21.
+
+### Target device (confirmed working)
+
+| Item | Detail |
+|------|--------|
+| Device | Galaxy Z Flip3 (SM-F711N) |
+| SoC | Snapdragon 888 |
+| GPU | Adreno 660 |
+| RAM | 8GB |
+| OS | Android 14 |
+| Model | Gemma 4 E2B (2.4GB) |
+| GPU usage | ~40% during inference |
+| Model load time | ~12 seconds |
+
 ### Stop the server
 
 ```bash
