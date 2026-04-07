@@ -108,6 +108,37 @@ curl -X POST http://127.0.0.1:8080/v1/chat/completions \
     "messages": [{"role": "user", "content": "Hello!"}],
     "max_tokens": 128
   }'
+
+# With thinking mode (returns reasoning_content in response)
+curl -X POST http://127.0.0.1:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemma",
+    "messages": [{"role": "user", "content": "What is 2+2?"}],
+    "enable_thinking": true
+  }'
+```
+
+### Request parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `messages` | (required) | Array of `{"role": "user", "content": "..."}` objects |
+| `temperature` | 0.7 | Controls randomness (0.0 = deterministic, 1.0+ = creative) |
+| `top_k` | 64 | Number of top candidates for sampling |
+| `top_p` | 0.95 | Nucleus sampling threshold |
+| `enable_thinking` | false | When true, response includes `reasoning_content` with the model's chain-of-thought |
+
+When `enable_thinking` is true, the response message contains both `content` (final answer) and `reasoning_content` (thinking process):
+
+```json
+{
+  "message": {
+    "role": "assistant",
+    "content": "4",
+    "reasoning_content": "Thinking Process:\n1. Analyze the question..."
+  }
+}
 ```
 
 ### Compatible models

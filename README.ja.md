@@ -108,6 +108,37 @@ curl -X POST http://127.0.0.1:8080/v1/chat/completions \
     "messages": [{"role": "user", "content": "こんにちは！"}],
     "max_tokens": 128
   }'
+
+# Thinkingモード（レスポンスにreasoning_contentが含まれる）
+curl -X POST http://127.0.0.1:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemma",
+    "messages": [{"role": "user", "content": "2+2は？"}],
+    "enable_thinking": true
+  }'
+```
+
+### リクエストパラメータ
+
+| パラメータ | デフォルト | 説明 |
+|-----------|-----------|------|
+| `messages` | (必須) | `{"role": "user", "content": "..."}` の配列 |
+| `temperature` | 0.7 | ランダム性の制御（0.0=確定的、1.0+=創造的） |
+| `top_k` | 64 | サンプリングの候補数 |
+| `top_p` | 0.95 | nucleus sampling の閾値 |
+| `enable_thinking` | false | trueにすると、レスポンスにモデルの思考プロセス（`reasoning_content`）が含まれる |
+
+`enable_thinking` を true にした場合、レスポンスの message に `content`（最終回答）と `reasoning_content`（思考過程）の両方が含まれます:
+
+```json
+{
+  "message": {
+    "role": "assistant",
+    "content": "4",
+    "reasoning_content": "Thinking Process:\n1. 問題を分析..."
+  }
+}
 ```
 
 ### 対応モデル
