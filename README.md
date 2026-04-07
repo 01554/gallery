@@ -1,5 +1,7 @@
 # Gallery + OpenAI-Compatible API Server (Fork)
 
+> **[日本語 README](README.ja.md)**
+
 > **This fork adds a localhost HTTP server to Google AI Edge Gallery, enabling OpenAI-compatible API access to on-device GPU-accelerated LLM inference via `curl` or any OpenAI client.**
 
 ## What this fork adds
