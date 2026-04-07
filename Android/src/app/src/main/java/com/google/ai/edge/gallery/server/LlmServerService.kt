@@ -9,10 +9,8 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import com.google.ai.edge.litertlm.Backend
-import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
-import com.google.ai.edge.litertlm.SamplerConfig
 
 private const val TAG = "LlmServerService"
 private const val CHANNEL_ID = "llm_server_channel"
@@ -55,17 +53,7 @@ class LlmServerService : Service() {
                 eng.initialize()
                 engine = eng
 
-                val conversation = eng.createConversation(
-                    ConversationConfig(
-                        samplerConfig = SamplerConfig(
-                            topK = 64,
-                            topP = 0.95,
-                            temperature = 0.7,
-                        )
-                    )
-                )
-
-                val server = LlmHttpServer(eng, conversation, port)
+                val server = LlmHttpServer(eng, port)
                 server.start()
                 httpServer = server
 

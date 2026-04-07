@@ -3,10 +3,11 @@ package com.google.ai.edge.gallery.server
 import android.util.Log
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
-import com.google.ai.edge.litertlm.Conversation
+import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.MessageCallback
+import com.google.ai.edge.litertlm.SamplerConfig
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
@@ -19,12 +20,8 @@ private const val TAG = "LlmHttpServer"
 
 class LlmHttpServer(
     private val engine: Engine,
-    private val conversation: Conversation,
     port: Int = 8080,
 ) : NanoHTTPD(port) {
-
-    private val promptTokenCounter = AtomicInteger(0)
-    private val completionTokenCounter = AtomicInteger(0)
 
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri
@@ -91,18 +88,29 @@ class LlmHttpServer(
 
         val requestJson = JSONObject(body)
         val messages = requestJson.getJSONArray("messages")
-        val maxTokens = requestJson.optInt("max_tokens", 512)
 
         // Build prompt from messages
         val prompt = buildPrompt(messages)
 
-        // Estimate prompt tokens (rough: 1 token ≈ 4 chars)
+        // Estimate prompt tokens (rough: 1 token ~ 4 chars)
         val estimatedPromptTokens = prompt.length / 4
+
+        // Create a fresh conversation for each request (stateless API)
+        val conversation = engine.createConversation(
+            ConversationConfig(
+                samplerConfig = SamplerConfig(
+                    topK = 64,
+                    topP = 0.95,
+                    temperature = requestJson.optDouble("temperature", 0.7),
+                )
+            )
+        )
 
         // Run inference synchronously
         val result = StringBuilder()
         val latch = CountDownLatch(1)
         val tokenCount = AtomicInteger(0)
+        var inferenceError: String? = null
 
         conversation.sendMessageAsync(
             Contents.of(listOf(Content.Text(prompt))),
@@ -118,6 +126,7 @@ class LlmHttpServer(
 
                 override fun onError(throwable: Throwable) {
                     Log.e(TAG, "Inference error", throwable)
+                    inferenceError = throwable.message
                     latch.countDown()
                 }
             },
@@ -126,6 +135,21 @@ class LlmHttpServer(
 
         // Wait for completion (timeout: 5 minutes)
         latch.await(5, TimeUnit.MINUTES)
+
+        // Close conversation to free resources
+        try {
+            conversation.close()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to close conversation", e)
+        }
+
+        if (inferenceError != null) {
+            return newFixedLengthResponse(
+                Response.Status.INTERNAL_ERROR,
+                "application/json",
+                """{"error":"inference failed: $inferenceError"}"""
+            )
+        }
 
         val completionTokens = tokenCount.get()
         val responseJson = JSONObject().apply {
@@ -154,7 +178,6 @@ class LlmHttpServer(
 
     private fun buildPrompt(messages: JSONArray): String {
         // Extract the last user message as prompt
-        // The conversation context is managed by LiteRT internally
         for (i in messages.length() - 1 downTo 0) {
             val msg = messages.getJSONObject(i)
             if (msg.getString("role") == "user") {
