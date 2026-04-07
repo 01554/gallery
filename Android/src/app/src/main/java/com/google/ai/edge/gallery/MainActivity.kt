@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier
                   .align(Alignment.BottomStart)
                   .padding(16.dp),
+                downloadedModels = modelManagerViewModel.getAllDownloadedModels(),
               )
             }
 
