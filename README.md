@@ -1,4 +1,108 @@
-# Google AI Edge Gallery ✨
+# Gallery + OpenAI-Compatible API Server (Fork)
+
+> **This fork adds a localhost HTTP server to Google AI Edge Gallery, enabling OpenAI-compatible API access to on-device GPU-accelerated LLM inference via `curl` or any OpenAI client.**
+
+## What this fork adds
+
+Google AI Edge Gallery is an Android app that runs LLMs on-device using TFLite GPU delegate. This fork adds a **Foreground Service** that exposes the inference engine as an **OpenAI-compatible HTTP API** on `localhost:8080`.
+
+This means you can run Gemma 4 (or other LiteRT models) on your phone's GPU and access it from Termux, scripts, or any app that speaks OpenAI API.
+
+### Why?
+
+On devices with Qualcomm Adreno 6xx GPUs (e.g. Snapdragon 888), llama.cpp's Vulkan and OpenCL backends both crash due to driver incompatibilities. TFLite GPU delegate is the only reliable way to do GPU inference on these devices. See [the full writeup](https://note.com/If_and_and/n/n363b74fa9579) for the investigation.
+
+### Added files
+
+| File | Description |
+|------|-------------|
+| `app/.../server/LlmHttpServer.kt` | NanoHTTPD server with `/v1/chat/completions`, `/v1/models`, `/health` |
+| `app/.../server/LlmServerService.kt` | Foreground Service that loads model with `Backend.GPU()` and starts HTTP server |
+
+### Modified files
+
+| File | Change |
+|------|--------|
+| `app/build.gradle.kts` | Added `nanohttpd:2.3.1` dependency |
+| `AndroidManifest.xml` | Added Service registration and `FOREGROUND_SERVICE_SPECIAL_USE` permission |
+
+## Quick Start
+
+### 1. Build the APK
+
+```bash
+# Requires Java 21 and Android SDK
+export JAVA_HOME=/path/to/openjdk-21
+cd Android/src
+echo "sdk.dir=/path/to/android-sdk" > local.properties
+./gradlew :app:assembleDebug
+```
+
+### 2. Install APK and push a model
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+# Download and push Gemma 4 E2B (2.4GB, works on 8GB RAM devices)
+curl -L "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm" \
+  -o gemma-4-E2B-it.litertlm
+adb push gemma-4-E2B-it.litertlm /data/local/tmp/
+```
+
+### 3. Start the server
+
+```bash
+adb shell am start-foreground-service \
+  -n com.google.aiedge.gallery/com.google.ai.edge.gallery.server.LlmServerService \
+  --es model_path '/data/local/tmp/gemma-4-E2B-it.litertlm' \
+  --ei port 8080
+```
+
+### 4. Use it
+
+From Termux or any app on the device:
+
+```bash
+# Health check
+curl http://127.0.0.1:8080/health
+
+# Chat completion (OpenAI-compatible)
+curl -X POST http://127.0.0.1:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemma",
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "max_tokens": 128
+  }'
+```
+
+### Compatible models
+
+Only official `litert-community` models are confirmed to work:
+
+| Model | Size | Min RAM | Download |
+|-------|------|---------|----------|
+| Gemma 4 E2B | 2.4GB | 8GB | [litert-community/gemma-4-E2B-it-litert-lm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) |
+| Gemma 3 1B | 557MB | 6GB | [litert-community/Gemma3-1B-IT](https://huggingface.co/litert-community/Gemma3-1B-IT) |
+| Gemma 4 E4B | 3.4GB | 12GB | [litert-community/gemma-4-E4B-it-litert-lm](https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm) |
+
+Third-party `.litertlm` files may crash. Stick with `litert-community` or `google` published models.
+
+### Tested on
+
+- Galaxy Z Flip3 (Snapdragon 888 / Adreno 660, 8GB RAM, Android 14)
+- Gemma 4 E2B: GPU usage ~40%, model load ~12s
+
+### Stop the server
+
+```bash
+adb shell am stop-service \
+  -n com.google.aiedge.gallery/com.google.ai.edge.gallery.server.LlmServerService
+```
+
+---
+
+# Google AI Edge Gallery
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/google-ai-edge/gallery)](https://github.com/google-ai-edge/gallery/releases)

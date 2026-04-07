@@ -1,0 +1,166 @@
+package com.google.ai.edge.gallery.server
+
+import android.util.Log
+import com.google.ai.edge.litertlm.Content
+import com.google.ai.edge.litertlm.Contents
+import com.google.ai.edge.litertlm.Conversation
+import com.google.ai.edge.litertlm.Engine
+import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.MessageCallback
+import fi.iki.elonen.NanoHTTPD
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+
+private const val TAG = "LlmHttpServer"
+
+class LlmHttpServer(
+    private val engine: Engine,
+    private val conversation: Conversation,
+    port: Int = 8080,
+) : NanoHTTPD(port) {
+
+    private val promptTokenCounter = AtomicInteger(0)
+    private val completionTokenCounter = AtomicInteger(0)
+
+    override fun serve(session: IHTTPSession): Response {
+        val uri = session.uri
+        val method = session.method
+
+        // CORS preflight
+        if (method == Method.OPTIONS) {
+            return newFixedLengthResponse(Response.Status.OK, MIME_PLAINTEXT, "").apply {
+                addHeader("Access-Control-Allow-Origin", "*")
+                addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                addHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            }
+        }
+
+        return try {
+            when {
+                uri == "/health" || uri == "/v1/health" -> handleHealth()
+                uri == "/v1/models" -> handleModels()
+                (uri == "/v1/chat/completions" || uri == "/chat/completions") && method == Method.POST -> handleChatCompletions(session)
+                uri == "/" -> handleRoot()
+                else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "application/json", """{"error":"not found"}""")
+            }.apply {
+                addHeader("Access-Control-Allow-Origin", "*")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error handling request", e)
+            newFixedLengthResponse(
+                Response.Status.INTERNAL_ERROR,
+                "application/json",
+                """{"error":"${e.message?.replace("\"", "\\\"") ?: "unknown error"}"}"""
+            )
+        }
+    }
+
+    private fun handleRoot(): Response {
+        return newFixedLengthResponse(Response.Status.OK, "application/json",
+            """{"status":"ok","message":"LLM Server (LiteRT + GPU)","endpoints":["/v1/chat/completions","/v1/models","/health"]}""")
+    }
+
+    private fun handleHealth(): Response {
+        return newFixedLengthResponse(Response.Status.OK, "application/json",
+            """{"status":"ok"}""")
+    }
+
+    private fun handleModels(): Response {
+        val json = JSONObject().apply {
+            put("object", "list")
+            put("data", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("id", "gemma")
+                    put("object", "model")
+                })
+            })
+        }
+        return newFixedLengthResponse(Response.Status.OK, "application/json", json.toString())
+    }
+
+    private fun handleChatCompletions(session: IHTTPSession): Response {
+        // Read body
+        val contentLength = session.headers["content-length"]?.toIntOrNull() ?: 0
+        val buf = ByteArray(contentLength)
+        session.inputStream.read(buf, 0, contentLength)
+        val body = String(buf)
+
+        val requestJson = JSONObject(body)
+        val messages = requestJson.getJSONArray("messages")
+        val maxTokens = requestJson.optInt("max_tokens", 512)
+
+        // Build prompt from messages
+        val prompt = buildPrompt(messages)
+
+        // Estimate prompt tokens (rough: 1 token ≈ 4 chars)
+        val estimatedPromptTokens = prompt.length / 4
+
+        // Run inference synchronously
+        val result = StringBuilder()
+        val latch = CountDownLatch(1)
+        val tokenCount = AtomicInteger(0)
+
+        conversation.sendMessageAsync(
+            Contents.of(listOf(Content.Text(prompt))),
+            object : MessageCallback {
+                override fun onMessage(message: Message) {
+                    result.append(message.toString())
+                    tokenCount.incrementAndGet()
+                }
+
+                override fun onDone() {
+                    latch.countDown()
+                }
+
+                override fun onError(throwable: Throwable) {
+                    Log.e(TAG, "Inference error", throwable)
+                    latch.countDown()
+                }
+            },
+            emptyMap(),
+        )
+
+        // Wait for completion (timeout: 5 minutes)
+        latch.await(5, TimeUnit.MINUTES)
+
+        val completionTokens = tokenCount.get()
+        val responseJson = JSONObject().apply {
+            put("id", "chatcmpl-${UUID.randomUUID().toString().take(8)}")
+            put("object", "chat.completion")
+            put("model", requestJson.optString("model", "gemma"))
+            put("choices", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("index", 0)
+                    put("message", JSONObject().apply {
+                        put("role", "assistant")
+                        put("content", result.toString())
+                    })
+                    put("finish_reason", "stop")
+                })
+            })
+            put("usage", JSONObject().apply {
+                put("prompt_tokens", estimatedPromptTokens)
+                put("completion_tokens", completionTokens)
+                put("total_tokens", estimatedPromptTokens + completionTokens)
+            })
+        }
+
+        return newFixedLengthResponse(Response.Status.OK, "application/json", responseJson.toString())
+    }
+
+    private fun buildPrompt(messages: JSONArray): String {
+        // Extract the last user message as prompt
+        // The conversation context is managed by LiteRT internally
+        for (i in messages.length() - 1 downTo 0) {
+            val msg = messages.getJSONObject(i)
+            if (msg.getString("role") == "user") {
+                return msg.getString("content")
+            }
+        }
+        return ""
+    }
+}

@@ -89,6 +89,7 @@ dependencies {
   implementation(libs.androidx.security.crypto)
   implementation(libs.androidx.webkit)
   implementation(libs.litertlm)
+  implementation("org.nanohttpd:nanohttpd:2.3.1")
   implementation(libs.commonmark)
   implementation(libs.richtext)
   implementation(libs.tflite)
