@@ -862,7 +862,7 @@ constructor(
               modelId = cm.id,
               modelFile = cm.fileName,
               commitHash = "main",
-              description = "Community model from litert-community (%.1f GB)".format(cm.sizeInBytes / 1e9),
+              description = "%.1f GB | litert-community".format(cm.sizeInBytes / 1e9),
               sizeInBytes = cm.sizeInBytes,
               url = cm.downloadUrl,
               minDeviceMemoryInGb = estimatedMinRamGb,
