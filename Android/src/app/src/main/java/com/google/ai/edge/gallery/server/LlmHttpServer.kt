@@ -23,9 +23,22 @@ class LlmHttpServer(
     port: Int = 8080,
 ) : NanoHTTPD(port) {
 
+    private val logBuffer = java.util.concurrent.ConcurrentLinkedDeque<String>()
+    private val maxLogLines = 50
+
+    private fun addLog(msg: String) {
+        val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+        logBuffer.addLast("[$ts] $msg")
+        while (logBuffer.size > maxLogLines) logBuffer.pollFirst()
+    }
+
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri
         val method = session.method
+
+        if (uri != "/logs" && uri != "/health") {
+            addLog("${method.name} $uri")
+        }
 
         // CORS preflight
         if (method == Method.OPTIONS) {
@@ -40,6 +53,7 @@ class LlmHttpServer(
             when {
                 uri == "/health" || uri == "/v1/health" -> handleHealth()
                 uri == "/v1/models" -> handleModels()
+                uri == "/logs" -> handleLogs()
                 (uri == "/v1/chat/completions" || uri == "/chat/completions") && method == Method.POST -> handleChatCompletions(session)
                 uri == "/" -> handleRoot()
                 else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "application/json", """{"error":"not found"}""")
@@ -64,6 +78,13 @@ class LlmHttpServer(
     private fun handleHealth(): Response {
         return newFixedLengthResponse(Response.Status.OK, "application/json",
             """{"status":"ok"}""")
+    }
+
+    private fun handleLogs(): Response {
+        val text = logBuffer.joinToString("\n")
+        return newFixedLengthResponse(Response.Status.OK, "text/plain", text).apply {
+            addHeader("Access-Control-Allow-Origin", "*")
+        }
     }
 
     private fun handleModels(): Response {
@@ -91,6 +112,9 @@ class LlmHttpServer(
 
         // Build contents from messages (text + images)
         val (prompt, contents) = buildContents(messages)
+        val imageCount = contents.count { it is Content.ImageBytes }
+        val promptPreview = if (prompt.length > 60) prompt.take(60) + "..." else prompt
+        addLog("prompt: \"$promptPreview\"" + if (imageCount > 0) " +${imageCount} image(s)" else "")
 
         // Parse sampling parameters from request (OpenAI-compatible names)
         val temperature = requestJson.optDouble("temperature", 0.7)
@@ -99,7 +123,6 @@ class LlmHttpServer(
         val enableThinking = requestJson.optBoolean("enable_thinking", false)
 
         // Estimate prompt tokens (rough: 1 token ~ 4 chars, + 256 per image)
-        val imageCount = contents.count { it is Content.ImageBytes }
         val estimatedPromptTokens = prompt.length / 4 + imageCount * 256
 
         // Create a fresh conversation for each request (stateless API)
@@ -163,6 +186,7 @@ class LlmHttpServer(
         }
 
         if (inferenceError != null) {
+            addLog("ERROR: $inferenceError")
             return newFixedLengthResponse(
                 Response.Status.INTERNAL_ERROR,
                 "application/json",
@@ -171,6 +195,7 @@ class LlmHttpServer(
         }
 
         val completionTokens = tokenCount.get()
+        addLog("done: ${completionTokens} tokens")
         val responseJson = JSONObject().apply {
             put("id", "chatcmpl-${UUID.randomUUID().toString().take(8)}")
             put("object", "chat.completion")
