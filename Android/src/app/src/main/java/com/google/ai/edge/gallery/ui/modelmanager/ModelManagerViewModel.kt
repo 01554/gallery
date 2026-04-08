@@ -855,14 +855,17 @@ constructor(
         try {
           val communityModels = com.google.ai.edge.gallery.server.CommunityModelBrowser.fetchLitertModels()
           val communityAllowedModels = communityModels.map { cm ->
+            // Estimate minimum RAM: model size * 2.5 (overhead for GPU buffers, runtime, OS)
+            val estimatedMinRamGb = ((cm.sizeInBytes / 1e9) * 2.5).toInt().coerceAtLeast(6)
             com.google.ai.edge.gallery.data.AllowedModel(
               name = cm.name,
               modelId = cm.id,
               modelFile = cm.fileName,
               commitHash = "main",
-              description = "Community model from litert-community",
+              description = "Community model from litert-community (%.1f GB)".format(cm.sizeInBytes / 1e9),
               sizeInBytes = cm.sizeInBytes,
               url = cm.downloadUrl,
+              minDeviceMemoryInGb = estimatedMinRamGb,
               defaultConfig = com.google.ai.edge.gallery.data.DefaultConfig(
                 topK = 64, topP = 0.95f, temperature = 0.7f,
                 accelerators = "gpu,cpu", visionAccelerator = null,
