@@ -65,6 +65,8 @@ class LlmServerService : Service() {
 
         Thread {
             try {
+                val fileName = modelPath.substringAfterLast("/")
+                ServerLog.add("Loading model: $fileName")
                 Log.i(TAG, "Loading model: $modelPath")
                 val engineConfig = EngineConfig(
                     modelPath = modelPath,
@@ -76,16 +78,19 @@ class LlmServerService : Service() {
                 val eng = Engine(engineConfig)
                 eng.initialize()
                 engine = eng
+                ServerLog.add("Model loaded (GPU)")
 
                 val server = LlmHttpServer(eng, port)
                 server.start()
                 httpServer = server
 
                 Log.i(TAG, "Server started on port $port")
+                ServerLog.add("Server listening on :$port")
                 updateNotification("Server running on port $port")
                 _state.value = ServerState.RUNNING
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start server", e)
+                ServerLog.add("ERROR: ${e.message}")
                 updateNotification("Error: ${e.message}")
                 _state.value = ServerState.ERROR
                 _errorMessage.value = e.message ?: "Unknown error"
@@ -96,6 +101,7 @@ class LlmServerService : Service() {
     }
 
     override fun onDestroy() {
+        ServerLog.add("Server stopped")
         httpServer?.stop()
         engine?.close()
         httpServer = null

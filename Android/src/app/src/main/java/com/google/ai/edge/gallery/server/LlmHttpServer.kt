@@ -23,14 +23,7 @@ class LlmHttpServer(
     port: Int = 8080,
 ) : NanoHTTPD(port) {
 
-    private val logBuffer = java.util.concurrent.ConcurrentLinkedDeque<String>()
-    private val maxLogLines = 50
-
-    private fun addLog(msg: String) {
-        val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
-        logBuffer.addLast("[$ts] $msg")
-        while (logBuffer.size > maxLogLines) logBuffer.pollFirst()
-    }
+    private fun addLog(msg: String) = ServerLog.add(msg)
 
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri
@@ -53,7 +46,6 @@ class LlmHttpServer(
             when {
                 uri == "/health" || uri == "/v1/health" -> handleHealth()
                 uri == "/v1/models" -> handleModels()
-                uri == "/logs" -> handleLogs()
                 (uri == "/v1/chat/completions" || uri == "/chat/completions") && method == Method.POST -> handleChatCompletions(session)
                 uri == "/" -> handleRoot()
                 else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "application/json", """{"error":"not found"}""")
@@ -80,12 +72,6 @@ class LlmHttpServer(
             """{"status":"ok"}""")
     }
 
-    private fun handleLogs(): Response {
-        val text = logBuffer.joinToString("\n")
-        return newFixedLengthResponse(Response.Status.OK, "text/plain", text).apply {
-            addHeader("Access-Control-Allow-Origin", "*")
-        }
-    }
 
     private fun handleModels(): Response {
         val json = JSONObject().apply {
