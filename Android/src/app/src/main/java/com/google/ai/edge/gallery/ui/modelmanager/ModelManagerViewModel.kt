@@ -862,6 +862,7 @@ constructor(
               commitHash = "main",
               description = "Community model from litert-community",
               sizeInBytes = cm.sizeInBytes,
+              url = cm.downloadUrl,
               defaultConfig = com.google.ai.edge.gallery.data.DefaultConfig(
                 topK = 64, topP = 0.95f, temperature = 0.7f,
                 accelerators = "gpu,cpu", visionAccelerator = null,
