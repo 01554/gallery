@@ -69,6 +69,7 @@ class LlmServerService : Service() {
                 val engineConfig = EngineConfig(
                     modelPath = modelPath,
                     backend = Backend.GPU(),
+                    visionBackend = Backend.GPU(),
                     maxNumTokens = 1024,
                     cacheDir = getExternalFilesDir(null)?.absolutePath,
                 )

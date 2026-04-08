@@ -89,8 +89,8 @@ class LlmHttpServer(
         val requestJson = JSONObject(body)
         val messages = requestJson.getJSONArray("messages")
 
-        // Build prompt from messages
-        val prompt = buildPrompt(messages)
+        // Build contents from messages (text + images)
+        val (prompt, contents) = buildContents(messages)
 
         // Parse sampling parameters from request (OpenAI-compatible names)
         val temperature = requestJson.optDouble("temperature", 0.7)
@@ -98,8 +98,9 @@ class LlmHttpServer(
         val topP = requestJson.optDouble("top_p", 0.95)
         val enableThinking = requestJson.optBoolean("enable_thinking", false)
 
-        // Estimate prompt tokens (rough: 1 token ~ 4 chars)
-        val estimatedPromptTokens = prompt.length / 4
+        // Estimate prompt tokens (rough: 1 token ~ 4 chars, + 256 per image)
+        val imageCount = contents.count { it is Content.ImageBytes }
+        val estimatedPromptTokens = prompt.length / 4 + imageCount * 256
 
         // Create a fresh conversation for each request (stateless API)
         val conversation = engine.createConversation(
@@ -122,7 +123,7 @@ class LlmHttpServer(
         var inferenceError: String? = null
 
         conversation.sendMessageAsync(
-            Contents.of(listOf(Content.Text(prompt))),
+            Contents.of(contents),
             object : MessageCallback {
                 override fun onMessage(message: Message) {
                     val thought = message.channels["thought"]
@@ -192,14 +193,87 @@ class LlmHttpServer(
         return newFixedLengthResponse(Response.Status.OK, "application/json", responseJson.toString())
     }
 
-    private fun buildPrompt(messages: JSONArray): String {
-        // Extract the last user message as prompt
+    /**
+     * Build a list of Content objects from OpenAI-compatible messages.
+     * Returns (textPrompt, contentList) where textPrompt is the raw text for token estimation.
+     *
+     * Supports:
+     * - Simple text: {"role": "user", "content": "Hello"}
+     * - Multimodal:  {"role": "user", "content": [
+     *     {"type": "text", "text": "What's in this image?"},
+     *     {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
+     *   ]}
+     */
+    private fun buildContents(messages: JSONArray): Pair<String, List<Content>> {
+        val contents = mutableListOf<Content>()
+        var textPrompt = ""
+
+        // Find the last user message
         for (i in messages.length() - 1 downTo 0) {
             val msg = messages.getJSONObject(i)
-            if (msg.getString("role") == "user") {
-                return msg.getString("content")
+            if (msg.getString("role") != "user") continue
+
+            val contentField = msg.get("content")
+
+            if (contentField is String) {
+                // Simple text message
+                textPrompt = contentField
+                contents.add(Content.Text(contentField))
+            } else if (contentField is JSONArray) {
+                // Multimodal message with text and images
+                // Add images first, then text (same order as gallery app)
+                val textParts = mutableListOf<String>()
+                val imageParts = mutableListOf<ByteArray>()
+
+                for (j in 0 until contentField.length()) {
+                    val part = contentField.getJSONObject(j)
+                    when (part.getString("type")) {
+                        "text" -> textParts.add(part.getString("text"))
+                        "image_url" -> {
+                            val imageUrl = part.getJSONObject("image_url").getString("url")
+                            val imageBytes = decodeImageUrl(imageUrl)
+                            if (imageBytes != null) {
+                                imageParts.add(imageBytes)
+                            }
+                        }
+                    }
+                }
+
+                // Images first, then text
+                for (bytes in imageParts) {
+                    contents.add(Content.ImageBytes(bytes))
+                }
+                textPrompt = textParts.joinToString("\n")
+                if (textPrompt.isNotEmpty()) {
+                    contents.add(Content.Text(textPrompt))
+                }
             }
+            break
         }
-        return ""
+
+        if (contents.isEmpty()) {
+            contents.add(Content.Text(""))
+        }
+
+        return Pair(textPrompt, contents)
+    }
+
+    private fun decodeImageUrl(url: String): ByteArray? {
+        return try {
+            if (url.startsWith("data:")) {
+                // data:image/png;base64,iVBOR...
+                val base64Data = url.substringAfter(",")
+                android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+            } else {
+                // Regular URL - download it
+                val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+                conn.inputStream.readBytes()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to decode image: ${e.message}")
+            null
+        }
     }
 }
