@@ -371,6 +371,11 @@ fun HomeScreen(
                       scope.launch { drawerState.apply { if (isClosed) open() else close() } }
                     },
                   ),
+                rightAction =
+                  AppBarAction(
+                    actionType = AppBarActionType.SERVER_LOGS,
+                    actionFn = { showServerLogs = true },
+                  ),
               )
             }
           },

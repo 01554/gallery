@@ -39,6 +39,9 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.rounded.Terminal
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -46,6 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.ai.edge.gallery.data.AppBarAction
 import com.google.ai.edge.gallery.data.AppBarActionType
+import com.google.ai.edge.gallery.server.LlmServerService
+import com.google.ai.edge.gallery.server.ServerState
 
 /** The top app bar. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -134,6 +139,24 @@ fun GalleryTopAppBar(
         // Click a button to navigate up.
         AppBarActionType.NAVIGATE_UP -> {
           TextButton(onClick = rightAction.actionFn) { Text("Done") }
+        }
+
+        // Server logs button with status color.
+        AppBarActionType.SERVER_LOGS -> {
+          val serverState by LlmServerService.state.collectAsState()
+          val iconTint = when (serverState) {
+            ServerState.STOPPED -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            ServerState.LOADING -> Color(0xFFFFB74D)
+            ServerState.RUNNING -> Color(0xFF66BB6A)
+            ServerState.ERROR -> Color(0xFFEF5350)
+          }
+          IconButton(onClick = rightAction.actionFn) {
+            Icon(
+              imageVector = Icons.Rounded.Terminal,
+              contentDescription = "Server logs",
+              tint = iconTint,
+            )
+          }
         }
 
         else -> {}
