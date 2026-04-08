@@ -41,12 +41,24 @@ object CommunityModelBrowser {
                     val treeJson = httpGet(treeUrl) ?: continue
                     val files = JSONArray(treeJson)
 
+                    val litertlmFiles = mutableListOf<Pair<String, Long>>()
                     for (j in 0 until files.length()) {
                         val file = files.getJSONObject(j)
                         val path = file.getString("path")
                         if (path.endsWith(".litertlm")) {
-                            val size = file.getLong("size")
-                            val name = modelId.removePrefix("litert-community/")
+                            litertlmFiles.add(Pair(path, file.getLong("size")))
+                        }
+                    }
+
+                    for ((path, size) in litertlmFiles) {
+                        if (path.endsWith(".litertlm")) {
+                            val baseName = modelId.removePrefix("litert-community/")
+                            // If multiple .litertlm files exist, use filename to distinguish
+                            val name = if (litertlmFiles.size > 1) {
+                                path.removeSuffix(".litertlm")
+                            } else {
+                                baseName
+                            }
                             val downloadUrl = "https://huggingface.co/$modelId/resolve/main/$path"
                             models.add(
                                 CommunityModel(
