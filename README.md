@@ -18,9 +18,12 @@ On devices with Qualcomm Adreno 6xx GPUs (e.g. Snapdragon 888), llama.cpp's Vulk
 
 | File | Description |
 |------|-------------|
-| `app/.../server/LlmHttpServer.kt` | NanoHTTPD server with `/v1/chat/completions`, `/v1/models`, `/health` |
+| `app/.../server/LlmHttpServer.kt` | NanoHTTPD server with `/v1/chat/completions`, `/v1/models`, `/health`. Supports text, images (base64/URL), thinking mode |
 | `app/.../server/LlmServerService.kt` | Foreground Service that loads model with `Backend.GPU()` and starts HTTP server. Exposes server state via `StateFlow` |
-| `app/.../server/ServerDrawerItem.kt` | Navigation drawer item for server start/stop with color-coded status |
+| `app/.../server/ServerDrawerItem.kt` | Navigation drawer item for server start/stop with color-coded status and log viewer access |
+| `app/.../server/ServerLogsScreen.kt` | Full-screen real-time log viewer with auto-scroll and color-coded entries |
+| `app/.../server/ServerLog.kt` | Shared log buffer (singleton, 100 lines) accessible from service and UI |
+| `app/.../server/CommunityModelBrowser.kt` | Fetches `.litertlm` models from `litert-community` on HuggingFace dynamically |
 | `app/.../server/ServerButton.kt` | Floating action button (kept for reference, not used in current UI) |
 
 ### Modified files
@@ -29,7 +32,10 @@ On devices with Qualcomm Adreno 6xx GPUs (e.g. Snapdragon 888), llama.cpp's Vulk
 |------|--------|
 | `app/build.gradle.kts` | Added `nanohttpd:2.3.1` dependency |
 | `AndroidManifest.xml` | Added Service registration and `FOREGROUND_SERVICE_SPECIAL_USE` permission |
-| `HomeScreen.kt` | Added "API Server" item to the navigation drawer (alongside Settings and Models) |
+| `HomeScreen.kt` | Added "API Server" to navigation drawer, server logs icon to top bar |
+| `GalleryAppTopBar.kt` | Added `SERVER_LOGS` action type with color-coded terminal icon |
+| `AppBarAction.kt` | Added `SERVER_LOGS` enum value |
+| `ModelManagerViewModel.kt` | Merged `litert-community` models into model allowlist with RAM warnings |
 
 ## Quick Start
 
@@ -119,6 +125,39 @@ curl -X POST http://127.0.0.1:8080/v1/chat/completions \
   }'
 ```
 
+### Image input (multimodal)
+
+Gemma 4 supports image input. Use the OpenAI-compatible format with base64 data URLs or HTTP URLs:
+
+```bash
+# Encode an image
+IMG_B64=$(base64 -w 0 photo.jpg)
+
+# Send image + text
+curl -X POST http://127.0.0.1:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"model\": \"gemma\",
+    \"messages\": [{
+      \"role\": \"user\",
+      \"content\": [
+        {\"type\": \"image_url\", \"image_url\": {\"url\": \"data:image/jpeg;base64,$IMG_B64\"}},
+        {\"type\": \"text\", \"text\": \"What do you see in this image?\"}
+      ]
+    }]
+  }"
+```
+
+### Server logs
+
+Tap the terminal icon in the top-right corner of the home screen to open the real-time log viewer. The icon color reflects server state:
+- Gray = stopped
+- Orange = loading
+- Green = running
+- Red = error
+
+The log viewer shows startup, requests (with prompt preview), and completion token counts.
+
 ### Request parameters
 
 | Parameter | Default | Description |
@@ -143,13 +182,18 @@ When `enable_thinking` is true, the response message contains both `content` (fi
 
 ### Compatible models
 
-Only official `litert-community` models are confirmed to work:
+Models from `litert-community` on HuggingFace are automatically listed in the app's Models page. You can also push `.litertlm` files to `/data/local/tmp/`.
 
-| Model | Size | Min RAM | Download |
-|-------|------|---------|----------|
-| Gemma 4 E2B | 2.4GB | 8GB | [litert-community/gemma-4-E2B-it-litert-lm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) |
-| Gemma 3 1B | 557MB | 6GB | [litert-community/Gemma3-1B-IT](https://huggingface.co/litert-community/Gemma3-1B-IT) |
-| Gemma 4 E4B | 3.4GB | 12GB | [litert-community/gemma-4-E4B-it-litert-lm](https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm) |
+Models confirmed working on 8GB RAM:
+
+| Model | Size | Features | Download |
+|-------|------|----------|----------|
+| Gemma 4 E2B | 2.4GB | text + image + thinking | [litert-community/gemma-4-E2B-it-litert-lm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) |
+| Gemma 3 1B | 557MB | text only | [litert-community/Gemma3-1B-IT](https://huggingface.co/litert-community/Gemma3-1B-IT) |
+| Qwen3-0.6B | 614MB | text only | [litert-community/Qwen3-0.6B](https://huggingface.co/litert-community/Qwen3-0.6B) |
+| DeepSeek-R1-Distill-Qwen-1.5B | ~1.5GB | text + reasoning | [litert-community/DeepSeek-R1-Distill-Qwen-1.5B](https://huggingface.co/litert-community/DeepSeek-R1-Distill-Qwen-1.5B) |
+
+Models too large for 8GB RAM will show a warning before download (e.g. Phi-4-mini at 3.9GB).
 
 Third-party `.litertlm` files may crash. Stick with `litert-community` or `google` published models.
 

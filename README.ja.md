@@ -18,9 +18,12 @@ Qualcomm Adreno 6xx GPU（Snapdragon 888など）では、llama.cppのVulkan/Ope
 
 | ファイル | 説明 |
 |---------|------|
-| `app/.../server/LlmHttpServer.kt` | NanoHTTPDによるHTTPサーバー。`/v1/chat/completions`, `/v1/models`, `/health`を提供 |
+| `app/.../server/LlmHttpServer.kt` | NanoHTTPDによるHTTPサーバー。テキスト・画像（base64/URL）・Thinkingモード対応 |
 | `app/.../server/LlmServerService.kt` | `Backend.GPU()`でモデルをロードし、HTTPサーバーを起動するForeground Service。サーバー状態を`StateFlow`で公開 |
-| `app/.../server/ServerDrawerItem.kt` | ナビゲーションドロワー用のサーバー起動/停止項目。状態に応じて色が変わる |
+| `app/.../server/ServerDrawerItem.kt` | ナビゲーションドロワー用のサーバー起動/停止項目。状態に応じて色が変わる。ログビューアーへのアクセス |
+| `app/.../server/ServerLogsScreen.kt` | リアルタイムログビューアー（全画面、自動スクロール、色分け表示） |
+| `app/.../server/ServerLog.kt` | 共有ログバッファ（シングルトン、100行）。ServiceとUIの両方からアクセス可能 |
+| `app/.../server/CommunityModelBrowser.kt` | HuggingFaceの`litert-community`から`.litertlm`モデルを動的に取得 |
 | `app/.../server/ServerButton.kt` | フローティングボタン版（参考用に残存、現UIでは未使用） |
 
 ### 変更したファイル
@@ -29,7 +32,10 @@ Qualcomm Adreno 6xx GPU（Snapdragon 888など）では、llama.cppのVulkan/Ope
 |---------|---------|
 | `app/build.gradle.kts` | `nanohttpd:2.3.1`の依存を追加 |
 | `AndroidManifest.xml` | Serviceの登録と`FOREGROUND_SERVICE_SPECIAL_USE`パーミッションを追加 |
-| `HomeScreen.kt` | ナビゲーションドロワーに「API Server」項目を追加（Settings・Modelsと同じ位置） |
+| `HomeScreen.kt` | ナビゲーションドロワーに「API Server」項目追加、トップバーにログアイコン追加 |
+| `GalleryAppTopBar.kt` | `SERVER_LOGS`アクションタイプ追加（色付きターミナルアイコン） |
+| `AppBarAction.kt` | `SERVER_LOGS` enum値を追加 |
+| `ModelManagerViewModel.kt` | `litert-community`モデルをallowlistに統合、RAM警告付き |
 
 ## 使い方
 
@@ -118,6 +124,38 @@ curl -X POST http://127.0.0.1:8080/v1/chat/completions \
     "enable_thinking": true
   }'
 ```
+
+### リクエストパラメータ
+
+### 画像入力（マルチモーダル）
+
+Gemma 4は画像入力に対応。OpenAI互換のbase64データURLまたはHTTP URLが使えます:
+
+```bash
+IMG_B64=$(base64 -w 0 photo.jpg)
+curl -X POST http://127.0.0.1:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"model\": \"gemma\",
+    \"messages\": [{
+      \"role\": \"user\",
+      \"content\": [
+        {\"type\": \"image_url\", \"image_url\": {\"url\": \"data:image/jpeg;base64,$IMG_B64\"}},
+        {\"type\": \"text\", \"text\": \"この画像に何が写っていますか？\"}
+      ]
+    }]
+  }"
+```
+
+### サーバーログ
+
+ホーム画面右上のターミナルアイコンをタップすると、リアルタイムログビューアーが開きます。アイコンの色でサーバー状態が分かります:
+- グレー = 停止中
+- オレンジ = ロード中
+- 緑 = 稼働中
+- 赤 = エラー
+
+起動ログ、リクエスト（プロンプトのプレビュー）、生成トークン数が表示されます。
 
 ### リクエストパラメータ
 
