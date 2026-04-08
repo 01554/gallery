@@ -851,6 +851,39 @@ constructor(
           return@launch
         }
 
+        // Fetch community models from litert-community and add to allowlist.
+        try {
+          val communityModels = com.google.ai.edge.gallery.server.CommunityModelBrowser.fetchLitertModels()
+          val communityAllowedModels = communityModels.map { cm ->
+            com.google.ai.edge.gallery.data.AllowedModel(
+              name = cm.name,
+              modelId = cm.id,
+              modelFile = cm.fileName,
+              commitHash = "main",
+              description = "Community model from litert-community",
+              sizeInBytes = cm.sizeInBytes,
+              defaultConfig = com.google.ai.edge.gallery.data.DefaultConfig(
+                topK = 64, topP = 0.95f, temperature = 0.7f,
+                accelerators = "gpu,cpu", visionAccelerator = null,
+                maxContextLength = null, maxTokens = 1024,
+              ),
+              taskTypes = listOf(com.google.ai.edge.gallery.data.BuiltInTaskId.LLM_CHAT),
+              llmSupportThinking = true,
+            )
+          }
+          // Add community models that aren't already in the allowlist.
+          val existingNames = modelAllowlist.models.map { it.name }.toSet()
+          val newModels = communityAllowedModels.filter { it.name !in existingNames }
+          if (newModels.isNotEmpty()) {
+            modelAllowlist = com.google.ai.edge.gallery.data.ModelAllowlist(
+              models = modelAllowlist.models + newModels
+            )
+            Log.d(TAG, "Added ${newModels.size} community models to allowlist")
+          }
+        } catch (e: Exception) {
+          Log.w(TAG, "Failed to fetch community models, continuing with official allowlist", e)
+        }
+
         Log.d(TAG, "Allowlist: $modelAllowlist")
 
         // Convert models in the allowlist.
