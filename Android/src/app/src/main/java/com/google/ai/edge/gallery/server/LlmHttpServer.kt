@@ -115,46 +115,51 @@ class LlmHttpServer(
 
         val extraContext = if (enableThinking) mapOf("enable_thinking" to "true") else emptyMap()
 
-        // Run inference synchronously
+        // Run inference synchronously, always close conversation when done
         val result = StringBuilder()
         val thinking = StringBuilder()
         val latch = CountDownLatch(1)
         val tokenCount = AtomicInteger(0)
         var inferenceError: String? = null
 
-        conversation.sendMessageAsync(
-            Contents.of(contents),
-            object : MessageCallback {
-                override fun onMessage(message: Message) {
-                    val thought = message.channels["thought"]
-                    if (thought != null) {
-                        thinking.append(thought)
-                    }
-                    result.append(message.toString())
-                    tokenCount.incrementAndGet()
-                }
-
-                override fun onDone() {
-                    latch.countDown()
-                }
-
-                override fun onError(throwable: Throwable) {
-                    Log.e(TAG, "Inference error", throwable)
-                    inferenceError = throwable.message
-                    latch.countDown()
-                }
-            },
-            extraContext,
-        )
-
-        // Wait for completion (timeout: 5 minutes)
-        latch.await(5, TimeUnit.MINUTES)
-
-        // Close conversation to free resources
         try {
-            conversation.close()
+            conversation.sendMessageAsync(
+                Contents.of(contents),
+                object : MessageCallback {
+                    override fun onMessage(message: Message) {
+                        val thought = message.channels["thought"]
+                        if (thought != null) {
+                            thinking.append(thought)
+                        }
+                        result.append(message.toString())
+                        tokenCount.incrementAndGet()
+                    }
+
+                    override fun onDone() {
+                        latch.countDown()
+                    }
+
+                    override fun onError(throwable: Throwable) {
+                        Log.e(TAG, "Inference error", throwable)
+                        inferenceError = throwable.message
+                        latch.countDown()
+                    }
+                },
+                extraContext,
+            )
+
+            // Wait for completion (timeout: 5 minutes)
+            latch.await(5, TimeUnit.MINUTES)
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to close conversation", e)
+            Log.e(TAG, "Failed to run inference", e)
+            inferenceError = e.message
+        } finally {
+            // Always close conversation to prevent session leak
+            try {
+                conversation.close()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to close conversation", e)
+            }
         }
 
         if (inferenceError != null) {
