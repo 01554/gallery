@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.List
 import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +50,7 @@ fun ServerDrawerItem(
     downloadedModels: List<Model> = emptyList(),
     port: Int = DEFAULT_PORT,
     onStarted: () -> Unit = {},
+    onLogsClicked: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val serverState by LlmServerService.state.collectAsState()
@@ -126,6 +129,7 @@ fun ServerDrawerItem(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Icon(
                 Icons.Rounded.Cloud,
@@ -134,7 +138,10 @@ fun ServerDrawerItem(
                 tint = iconColor,
             )
             Spacer(modifier = Modifier.width(16.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.weight(1f),
+            ) {
                 Text(
                     "API Server",
                     color = MaterialTheme.colorScheme.onSurface,
@@ -145,6 +152,15 @@ fun ServerDrawerItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
+            }
+            if (serverState == ServerState.RUNNING) {
+                IconButton(onClick = onLogsClicked) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.List,
+                        contentDescription = "View logs",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
     }
