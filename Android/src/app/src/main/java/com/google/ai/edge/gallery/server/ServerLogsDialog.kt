@@ -27,24 +27,33 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ServerLogsDialog(onDismiss: () -> Unit) {
     val serverState by LlmServerService.state.collectAsState()
+    val serverPort by LlmServerService.port.collectAsState()
     var logs by remember { mutableStateOf(listOf<String>()) }
+    var fetchError by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
     // Poll logs from the HTTP server every second
-    LaunchedEffect(serverState) {
+    LaunchedEffect(serverState, serverPort) {
         if (serverState == ServerState.RUNNING) {
             while (true) {
                 try {
-                    val text = fetchLogs()
+                    val text = fetchLogs(serverPort)
                     if (text != null) {
                         logs = text.split("\n").filter { it.isNotBlank() }
+                        fetchError = ""
+                    } else {
+                        fetchError = "Failed to fetch logs from :$serverPort"
                     }
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    fetchError = "Error: ${e.message}"
+                }
                 delay(1000)
             }
         }
@@ -90,7 +99,8 @@ fun ServerLogsDialog(onDismiss: () -> Unit) {
                 )
             } else if (logs.isEmpty()) {
                 Text(
-                    "No logs yet. Send a request to see activity.",
+                    if (fetchError.isNotEmpty()) fetchError
+                    else "No logs yet. Send a request to see activity.",
                     style = MaterialTheme.typography.bodySmall,
                 )
             } else {
@@ -130,9 +140,9 @@ fun ServerLogsDialog(onDismiss: () -> Unit) {
     )
 }
 
-private fun fetchLogs(): String? {
+private fun fetchLogs(port: Int): String? {
     return try {
-        val conn = java.net.URL("http://127.0.0.1:8080/logs").openConnection() as java.net.HttpURLConnection
+        val conn = java.net.URL("http://127.0.0.1:$port/logs").openConnection() as java.net.HttpURLConnection
         conn.connectTimeout = 2000
         conn.readTimeout = 2000
         if (conn.responseCode == 200) {

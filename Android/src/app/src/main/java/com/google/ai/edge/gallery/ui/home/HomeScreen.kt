@@ -530,7 +530,7 @@ fun HomeScreen(
   }
 
   if (showServerLogs) {
-    com.google.ai.edge.gallery.server.ServerLogsDialog(onDismiss = { showServerLogs = false })
+    com.google.ai.edge.gallery.server.ServerLogsScreen(onClose = { showServerLogs = false })
   }
 
   if (uiState.loadingModelAllowlistError.isNotEmpty()) {
